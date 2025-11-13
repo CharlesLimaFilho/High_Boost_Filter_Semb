@@ -472,12 +472,12 @@ void receber() {
 		char comando = ' ';
 
 		comando = 'I';
-		HAL_UART_Transmit(&huart2, &comando, 1, 10);
+		HAL_UART_Transmit(&huart2, &comando, 1, 100);
 		if (HAL_UART_Receive(&huart2, tamanho, 3, HAL_MAX_DELAY) == HAL_OK) {
 			tam = (tamanho[0] - '0') * 100 + (tamanho[1] - '0') * 10 + (tamanho[2] - '0');
+
 			comando = 'M';
-			HAL_UART_Transmit(&huart2, &comando, 1, 50);
-			//tam = (tamanho[0] - '0');
+			HAL_UART_Transmit(&huart2, &comando, 1, 10);
 			if (HAL_UART_Receive(&huart2, buf, tam, HAL_MAX_DELAY) == HAL_OK) {
 				tratar_linha(buf, tam);
 			}

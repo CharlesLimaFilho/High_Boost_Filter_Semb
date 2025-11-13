@@ -2310,10 +2310,10 @@ void receber() {
  80011fc:	193b      	adds	r3, r7, r4
  80011fe:	2249      	movs	r2, #73	@ 0x49
  8001200:	701a      	strb	r2, [r3, #0]
-		HAL_UART_Transmit(&huart2, &comando, 1, 10);
+		HAL_UART_Transmit(&huart2, &comando, 1, 100);
  8001202:	1939      	adds	r1, r7, r4
  8001204:	482c      	ldr	r0, [pc, #176]	@ (80012b8 <receber+0xd8>)
- 8001206:	230a      	movs	r3, #10
+ 8001206:	2364      	movs	r3, #100	@ 0x64
  8001208:	2201      	movs	r2, #1
  800120a:	f001 fbe5 	bl	80029d8 <HAL_UART_Transmit>
 		if (HAL_UART_Receive(&huart2, tamanho, 3, HAL_MAX_DELAY) == HAL_OK) {
@@ -2352,17 +2352,17 @@ void receber() {
  800124e:	006d      	lsls	r5, r5, #1
  8001250:	197a      	adds	r2, r7, r5
  8001252:	6013      	str	r3, [r2, #0]
+
 			comando = 'M';
  8001254:	193b      	adds	r3, r7, r4
  8001256:	224d      	movs	r2, #77	@ 0x4d
  8001258:	701a      	strb	r2, [r3, #0]
-			HAL_UART_Transmit(&huart2, &comando, 1, 50);
+			HAL_UART_Transmit(&huart2, &comando, 1, 10);
  800125a:	1939      	adds	r1, r7, r4
  800125c:	4816      	ldr	r0, [pc, #88]	@ (80012b8 <receber+0xd8>)
- 800125e:	2332      	movs	r3, #50	@ 0x32
+ 800125e:	230a      	movs	r3, #10
  8001260:	2201      	movs	r2, #1
  8001262:	f001 fbb9 	bl	80029d8 <HAL_UART_Transmit>
-			//tam = (tamanho[0] - '0');
 			if (HAL_UART_Receive(&huart2, buf, tam, HAL_MAX_DELAY) == HAL_OK) {
  8001266:	002c      	movs	r4, r5
  8001268:	193b      	adds	r3, r7, r4
