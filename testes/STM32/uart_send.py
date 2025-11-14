@@ -1,4 +1,5 @@
 from array import array
+from asyncore import write
 from time import sleep
 import serial
 import time
@@ -6,11 +7,7 @@ import numpy as np
 
 cont = 0
 frase = b'Charles\n'
-ser = serial.Serial('COM7',115200)
-
-arr = [b'10 ',b'20 ',b'30 ',b'40\n']
-arr2 = [101, 102, 103, 104]
-
+ser = serial.Serial('COM5',115200)
 
 def read_pgm_p2(path):
     with open(path, 'r') as f:
@@ -31,46 +28,81 @@ def read_pgm_p2(path):
         arr = np.array(data, dtype=np.int32).reshape((height, width))
         return arr, max_val
 
-def send_receive():
-    while True:
-        if cont == 4:
-            sleep(1.5)
-            valor = ser.readline()
-            valor_str = valor.decode('utf-8')
-            print(valor_str)
-            cont = 0
-
-            valor_split = valor_str.split(" ")
-            I = [0, 1, -1]
-            valor_split = np.delete(valor_split, I).tolist()
-            valor_int = [int(num) for num in valor_split]
-        else:
-            arr2b = str(arr2[cont])
-            arr2b = arr2b + " "
-            ser.write(bytes(str(arr2b), 'ascii'))
-            print(cont)
-            # sleep(0.4)
-            cont = cont + 1
-            if cont == 4:
-                ser.write(b'\n')
-
-#imagem, max_val = read_pgm_p2("C:/Dev/repos/git/CLion/semb2/implementacoes_Python/inputs/balloons.ascii.pgm")
 
 
-#arr2b = bytes(arr2)
+def write_pgm_p2(path, arr, max_val=255):
+    h, w = arr.shape
+    with open(path, 'w') as f:
+        f.write('P2\n')
+        f.write(f'# High-boost result\n')
+        f.write(f'{w} {h}\n')
+        f.write(f'{max_val}\n')
+        for i in range(h):
+            row = arr[i, :]
+            row_int = [str(int(val)) for val in row]
+            f.write(' '.join(row_int))
+            f.write('\n')
 
+def sincronizar():
+    contsinc = 0
+    sincronizado = False
+    while not sincronizado:
+        print("Sincronizando...")
+        comandosinc = ser.read(1)
+        print(f"Comando sincronia: {comandosinc.decode('utf-8')}")
+        if comandosinc.decode('utf-8') == 'S':
+            contsinc = contsinc + 1
+            print(f"Contsinc: {contsinc}")
+        if contsinc == 2:
+            sincronizado = True
+            print("Sincronizado \n\n")
+            ser.write(bytes('S', 'ascii'))
 
+imagem, max_val = read_pgm_p2("C:/Dev/repos/git/CLion/semb2/implementacoes_Python/inputs/mona_lisa.ascii.pgm")
 
+sincronizar()
 
-#print("\nValor recebido : " + str(valor))
+for row in imagem:
+    linha_str = ' '.join(str(pixel) for pixel in row) + '\n'
+    v = len(linha_str)
+    print(f"Linha : {cont + 1}")
 
-time.sleep(1.8)
-valor = ser.readline()
-valor_str = valor.decode('utf-8')
-print(valor_str)
+    print("Aguardando comando 1")
+    comando = ser.read(1)
+    print(f" Comando atual: {comando.decode('utf-8')}")
+    if comando.decode('utf-8') == 'I':
+        sleep(0.4)
+        ser.write(bytes(str(len(linha_str)), 'ascii'))
+        print("Len da linha enviado")
+    sleep(0.5)
 
+    print("Aguardando comando 2")
 
-send_receive()
+    comando = ser.read(1)
+    print(f" Comando atual: {comando.decode('utf-8')}")
 
+    if comando.decode('utf-8') == 'M':
+        sleep(0.4)
+        ser.write(bytes(linha_str, 'ascii'))
+        print("Linha enviada")
+    ser.flush()
+    cont = cont + 1
+    if cont == 30:
+        break
 
+print("Finalizando...")
+
+cont = 0
+filtrado = []
+
+while cont < 30:
+    valores = ser.readline()
+    arr = valores.decode('utf-8').split()
+    filtrado.append(np.array(arr, dtype=float))
+
+    print(arr)
+    cont = cont + 1
+
+output = np.array(filtrado, dtype=np.float32)
+write_pgm_p2("C:/Dev/repos/git/CLion/semb2/implementacoes_Python/outputs/24.pgm", output, 255)
 ser.close()
