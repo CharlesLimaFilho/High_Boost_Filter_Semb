@@ -1,12 +1,12 @@
-from array import array
-from asyncore import write
 from time import sleep
 import serial
 import time
 import numpy as np
 
-cont = 0
+fatias = 0
+linha_inicial = 0
 frase = b'Charles\n'
+filtrado = []
 ser = serial.Serial('COM5',115200)
 
 def read_pgm_p2(path):
@@ -58,50 +58,72 @@ def sincronizar():
             print("Sincronizado \n\n")
             ser.write(bytes('S', 'ascii'))
 
+
+def receber_stm():
+    cont_re = 0
+    limite = 29
+    if fatias == 1:
+        limite = 30
+    elif fatias == 2:
+        limite = 31
+    while cont_re < limite:
+        valores = ser.readline()
+        arr = valores.decode('utf-8').split()
+        filtrado.append(np.array(arr, dtype=float))
+
+        print(arr)
+        cont_re = cont_re + 1
+
+
+def enviar_stm(linha_inicial):
+    cont_en = linha_inicial
+    for row in imagem:
+        linha_str = ' '.join(str(pixel) for pixel in row) + '\n'
+        print(f"Linha : {cont_en + 1}")
+
+        print("Aguardando comando 1")
+        comando = ser.read(1)
+        print(f" Comando atual: {comando.decode('utf-8')}")
+        if comando.decode('utf-8') == 'I':
+            sleep(0.4)
+            ser.write(bytes(str(len(linha_str)), 'ascii'))
+            print("Len da linha enviado")
+        sleep(0.5)
+
+        print("Aguardando comando 2")
+
+        comando = ser.read(1)
+        print(f" Comando atual: {comando.decode('utf-8')}")
+
+        if comando.decode('utf-8') == 'M':
+            sleep(0.4)
+            ser.write(bytes(linha_str, 'ascii'))
+            print("Linha enviada")
+        ser.flush()
+        cont_en = cont_en + 1
+        if cont_en == 30:
+            break
+
+#####################################################################################################################
+
+
 imagem, max_val = read_pgm_p2("C:/Dev/repos/git/CLion/semb2/implementacoes_Python/inputs/mona_lisa.ascii.pgm")
 
 sincronizar()
 
-for row in imagem:
-    linha_str = ' '.join(str(pixel) for pixel in row) + '\n'
-    v = len(linha_str)
-    print(f"Linha : {cont + 1}")
 
-    print("Aguardando comando 1")
-    comando = ser.read(1)
-    print(f" Comando atual: {comando.decode('utf-8')}")
-    if comando.decode('utf-8') == 'I':
-        sleep(0.4)
-        ser.write(bytes(str(len(linha_str)), 'ascii'))
-        print("Len da linha enviado")
-    sleep(0.5)
-
-    print("Aguardando comando 2")
-
-    comando = ser.read(1)
-    print(f" Comando atual: {comando.decode('utf-8')}")
-
-    if comando.decode('utf-8') == 'M':
-        sleep(0.4)
-        ser.write(bytes(linha_str, 'ascii'))
-        print("Linha enviada")
-    ser.flush()
-    cont = cont + 1
-    if cont == 30:
-        break
+while fatias < 3:
+    enviar_stm(linha_inicial)
+    receber_stm()
+    fatias = fatias + 1
+    for i in range(30):
+        imagem = np.delete(imagem, 0, 0)
 
 print("Finalizando...")
 
-cont = 0
-filtrado = []
 
-while cont < 30:
-    valores = ser.readline()
-    arr = valores.decode('utf-8').split()
-    filtrado.append(np.array(arr, dtype=float))
 
-    print(arr)
-    cont = cont + 1
+
 
 output = np.array(filtrado, dtype=np.float32)
 write_pgm_p2("C:/Dev/repos/git/CLion/semb2/implementacoes_Python/outputs/24.pgm", output, 255)

@@ -412,20 +412,29 @@ const uint8_t imagem[60][90] = { { 106, 99, 97, 88, 93, 101, 98, 96, 90, 88, 91,
 				4, 8, 8, 5, 4, 4, 4, 2, 4, 2, 4, 6, 5, 3, 7, 9, 6, 7, 9, 12, 16,
 				20, 20, 19 } };
 
-uint8_t imagem_padd[32][92];
+uint8_t imagem_padd[33][92];
 uint8_t linhas_finais[2][92];
 uint8_t suavizado[30][90];
-uint8_t filtrado[30][90];
 uint8_t altura = 30, largura = 90, max_val;
-uint8_t altura_trat = 1, largura_trat = 1;
+uint8_t altura_trat = 3, largura_trat = 1;
+uint8_t altura_atual, altura_final = 32;
 
 uint8_t fatia = 0;
-uint8_t total_fatias = 5;
+uint8_t total_fatias = 3;
+uint8_t sincronizado = 0;
+uint8_t tratcond = 1;
 float amp = 2.0f;
+
 
 void tratar_linha(uint8_t *buffer, int tamanho) {
 	uint8_t digito = 0;
 	uint8_t valor = 0;
+
+	if (fatia == 2 && tratcond) {
+		altura_trat = 2;
+		tratcond = 0;
+	}
+
 	for (int i = 0; i < tamanho; i++) {
 		uint8_t aux = buffer[i];
 
@@ -447,7 +456,6 @@ void tratar_linha(uint8_t *buffer, int tamanho) {
 	}
 }
 
-
 void sincronizar() {
 	char comandoSinc = 'S';
 	char resposta = ' ';
@@ -463,7 +471,6 @@ void sincronizar() {
 	}
 }
 
-
 void receber() {
 	for (int i = 1; i < altura + 1; i++) {
 		uint8_t tamanho[3];
@@ -474,7 +481,8 @@ void receber() {
 		comando = 'I';
 		HAL_UART_Transmit(&huart2, &comando, 1, 100);
 		if (HAL_UART_Receive(&huart2, tamanho, 3, HAL_MAX_DELAY) == HAL_OK) {
-			tam = (tamanho[0] - '0') * 100 + (tamanho[1] - '0') * 10 + (tamanho[2] - '0');
+			tam = (tamanho[0] - '0') * 100 + (tamanho[1] - '0') * 10
+					+ (tamanho[2] - '0');
 
 			comando = 'M';
 			HAL_UART_Transmit(&huart2, &comando, 1, 10);
@@ -483,61 +491,83 @@ void receber() {
 			}
 		}
 	}
+	altura_trat = 3;
 }
 
 /*
  * Copias as linhas finais, caso a condicao seja 0
  * Caso condicao maior que 0, cola as linhas finais no topo da imagem e copia as ultimas
  */
-/*
- void copiar_linhas_finais(uint8_t condicao) {
- if (condicao == 0) {
- for (int i = altura - 1; i < altura + 1; i++) {
- for (int j = 0; j < largura + 2; j++) {
- linhas_finais[i][j] = imagem_padd[i][j];
- }
- }
- } else if (condicao > 0) {
- for (int i = 0; i < 2; i++) {
- for (int j = 0; j < largura + 2; j++) {
- imagem_padd[i][j] = linhas_finais[i][j];
- }
- }
 
- for (int i = altura - 1; i < altura + 1; i++) {
- for (int j = 0; j < largura + 2; j++) {
- linhas_finais[i][j] = imagem_padd[i][j];
- }
- }
- }
- }
- */
+void copiar_linhas_finais(uint8_t condicao) {
+	uint8_t copia_cont = 0;
+	if (condicao == 0) {
+		for (int i = altura + 1; i < altura + 3; i++) {
+			for (int j = 0; j < largura + 2; j++) {
+				linhas_finais[copia_cont][j] = imagem_padd[i][j];
+			}
+			copia_cont++;
+		}
+	} else if (condicao > 0) {
+		for (int i = altura + fatia; i < altura + 3; i++) {
+			for (int j = 0; j < largura + 2; j++) {
+				linhas_finais[copia_cont][j] = imagem_padd[i][j];
+			}
+			copia_cont++;
+		}
+	}
+}
+
+void colar_linhas_finais() {
+	uint8_t colar_cont = 0;
+	for (int i = 2 - fatia; i < 4 - fatia; i++) {
+		for (int j = 0; j < largura + 2; j++) {
+			imagem_padd[i][j] = linhas_finais[colar_cont][j];
+		}
+		colar_cont++;
+	}
+}
 
 // Lembrar de colocar no loop !!!!!!!!!!!!!!!!!
 void high_boost() {
 	// Aplica o zero padding antes da imagem ser recebida
-	for (int i = 0; i < altura + 2; i++) {
+	for (int i = 0; i < altura + 3; i++) {
 		for (int j = 0; j < largura + 2; j++) {
 			imagem_padd[i][j] = 0;
 		}
 	}
 
-	sincronizar();
-	receber();
-	HAL_Delay(1000);
-	//for (int i = 1; i < altura + 1; i++) {
-	//	for (int j = 1; j < largura + 1; j++) {
-	//		imagem_padd[i][j] = imagem[i - 1][j - 1];
-	//	}
-	//}
+	if (!sincronizado) {
+		sincronizar();
+		sincronizado++;
+	}
 
-	//Copiando as duas ultimas linhas
-	//copiar_linhas_finais(fatia);
+	receber();
+
+	HAL_Delay(1000);
+
+	//Copiando as duas ultimas linhas utilizando a fatia como condicao
+
+	if (fatia) {
+		colar_linhas_finais();
+		copiar_linhas_finais(fatia);
+	} else {
+		copiar_linhas_finais(fatia);
+	}
+
+ 	if (!fatia) {
+		altura_atual = 3;
+	} else if (fatia == 1) {
+		altura_atual = 2;
+	} else if (fatia == 2) {
+		altura_atual = 1;
+		altura_final = 32;
+	}
 
 	// Aplica filtro de suavizacao
 	// A imagem e percorrida pixel a pixel enquanto calcula a media
 	// somando o valor dos pixels ao redor (3x3) e dividindo por 9
-	for (int i = 1; i < altura + 1; i++) {
+	for (int i = altura_atual; i < altura_final; i++) {
 		for (int j = 1; j < largura + 1; j++) {
 			// Calcula media 3x3
 			int sum = 0;
@@ -573,9 +603,6 @@ void high_boost() {
 		printf("\n");
 		HAL_Delay(300);
 	}
-
-	printf("\n--- Processamento Completo ---\n");
-	printf("Dimensões: %dx%d\n", altura, largura);
 }
 
 /* USER CODE END 0 */
@@ -611,9 +638,11 @@ int main(void) {
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
 
-	high_boost();
-	printf("Finalizando;..\n");
-
+	for (int i = 0; i < 3; i++) {
+		high_boost();
+		fatia++;
+		HAL_Delay(700);
+	}
 
 	/* USER CODE END 2 */
 
